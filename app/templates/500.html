@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Server Error{% endblock %}
+{% block page_title %}500{% endblock %}
+{% block content %}
+<div style="text-align:center;padding:60px 20px">
+  <div style="font-size:3rem;color:var(--red);font-weight:700">500</div>
+  <div style="font-size:0.8rem;color:var(--text2);margin-top:8px">Internal server error</div>
+  <a href="/dashboard" class="btn btn-p" style="margin-top:16px">Back to Dashboard</a>
+</div>
+{% endblock %}

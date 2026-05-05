@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Infrastructure Discovery{% endblock %}
+{% block page_title %}Infrastructure Discovery{% endblock %}
+{% block content %}
+<style>
+.disc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;height:calc(100vh - 108px)}
+.disc-left{overflow-y:auto;display:flex;flex-direction:column}
+.disc-right{display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+.net-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px}
+.net-title{font-size:0.75rem;font-weight:700;color:var(--cyan);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:8px}
+.host-item{background:var(--bg3);border-left:3px solid var(--cyan);padding:8px 12px;margin-bottom:6px;border-radius:3px;font-size:0.65rem}
+.host-ip{color:var(--cyan);font-weight:700;font-family:monospace}
+.host-type{display:inline-block;padding:2px 6px;background:rgba(0,229,255,0.1);border:1px solid rgba(0,229,255,0.2);border-radius:3px;font-size:0.55rem;color:var(--cyan);margin-top:4px}
+.host-type.vmware{background:rgba(255,107,107,0.1);border-color:rgba(255,107,107,0.2);color:#ff6b6b}
+.host-type.docker{background:rgba(0,188,212,0.1);border-color:rgba(0,188,212,0.2);color:#00bcd4}
+.disc-stats{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-bottom:8px}
+.stat-row{display:flex;justify-content:space-between;font-size:0.65rem;margin-bottom:6px}
+.stat-label{color:var(--text3)}
+.stat-value{color:var(--cyan);font-weight:700;font-family:monospace}
+.disc-btn{padding:8px 16px;background:rgba(0,229,255,0.1);border:1px solid var(--cyan);color:var(--cyan);border-radius:6px;cursor:pointer;font-size:0.65rem;font-weight:600;transition:all 0.2s}
+.disc-btn:hover{background:rgba(0,229,255,0.2)}
+.disc-btn:disabled{opacity:0.5;cursor:not-allowed}
+.loading{text-align:center;padding:20px;color:var(--text3);font-size:0.65rem}
+.spinner{display:inline-block;width:20px;height:20px;border:2px solid rgba(0,229,255,0.2);border-top-color:var(--cyan);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+
+<div class="disc-grid">
+  <div class="disc-left">
+    <div class="card" style="margin-bottom:0;overflow:hidden;flex:1">
+      <div class="card-h">
+        <h3>Infrastructure Discovery</h3>
+        <button id="start-disc-btn" onclick="startDiscovery()" class="btn btn-p btn-sm">▶ Scan Networks</button>
+      </div>
+      <div id="disc-content">
+        <div class="loading">
+          <p>Click "Scan Networks" to auto-discover all hosts, services, and infrastructure.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="disc-right">
+    <div class="disc-stats">
+      <div class="stat-row">
+        <span class="stat-label">Total Hosts Found</span>
+        <span class="stat-value" id="stat-hosts">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Services Detected</span>
+        <span class="stat-value" id="stat-services">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">VMware Hosts</span>
+        <span class="stat-value" id="stat-vmware">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Docker Hosts</span>
+        <span class="stat-value" id="stat-docker">0</span>
+      </div>
+      <div class="stat-row">
+        <span class="stat-label">Status</span>
+        <span class="stat-value" id="stat-status">Ready</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+var currentDiscoveryId = null;
+
+function startDiscovery() {
+  var btn = document.getElementById('start-disc-btn');
+  btn.disabled = true;
+  btn.textContent = '⟳ Scanning...';
+  document.getElementById('stat-status').textContent = 'Scanning...';
+  
+  fetch('/api/discover/start', {method: 'POST', headers: {'Content-Type': 'application/json'}})
+    .then(r => r.json())
+    .then(d => {
+      currentDiscoveryId = d.discovery_id;
+      pollDiscovery();
+    })
+    .catch(e => {
+      btn.disabled = false;
+      btn.textContent = '▶ Scan Networks';
+      alert('Error: ' + e.message);
+    });
+}
+
+function pollDiscovery() {
+  if (!currentDiscoveryId) return;
+  
+  fetch('/api/discover/' + currentDiscoveryId)
+    .then(r => r.json())
+    .then(d => {
+      if (d.status === 'running') {
+        setTimeout(pollDiscovery, 2000);
+        return;
+      }
+      
+      document.getElementById('start-disc-btn').disabled = false;
+      document.getElementById('start-disc-btn').textContent = '▶ Scan Networks';
+      displayResults(d);
+    })
+    .catch(e => console.error(e));
+}
+
+function displayResults(data) {
+  if (data.error) {
+    alert('Discovery error: ' + data.error);
+    return;
+  }
+  
+  var totalHosts = 0, totalServices = 0, vmwareCount = 0, dockerCount = 0;
+  var html = '';
+  
+  for (var net in data.networks) {
+    var netData = data.networks[net];
+    html += '<div class="net-card"><div class="net-title">' + net + '</div>';
+    
+    if (netData.hosts.length === 0) {
+      html += '<div style="font-size:0.6rem;color:var(--text3)">No active hosts</div>';
+    } else {
+      for (var i = 0; i < netData.hosts.length; i++) {
+        var host = netData.hosts[i];
+        totalHosts++;
+        totalServices += host.services.length;
+        
+        var typeClass = '';
+        if (host.type === 'vmware_host') vmwareCount++;
+        if (host.type === 'docker_host') dockerCount++;
+        if (host.type.indexOf('vmware') >= 0) typeClass = ' vmware';
+        if (host.type.indexOf('docker') >= 0) typeClass = ' docker';
+        
+        html += '<div class="host-item"><span class="host-ip">' + host.ip + '</span>';
+        if (host.hostname) html += ' (' + host.hostname + ')';
+        html += '<div class="host-type' + typeClass + '">' + host.type.replace(/_/g, ' ').toUpperCase() + '</div>';
+        if (host.services.length > 0) {
+          html += '<div style="margin-top:4px;font-size:0.6rem;color:var(--text3)">Ports: ' + host.services.join(', ') + '</div>';
+        }
+        html += '</div>';
+      }
+    }
+    html += '</div>';
+  }
+  
+  document.getElementById('disc-content').innerHTML = html;
+  document.getElementById('stat-hosts').textContent = totalHosts;
+  document.getElementById('stat-services').textContent = totalServices;
+  document.getElementById('stat-vmware').textContent = vmwareCount;
+  document.getElementById('stat-docker').textContent = dockerCount;
+  document.getElementById('stat-status').textContent = 'Complete';
+}
+</script>
+{% endblock %}

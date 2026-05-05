@@ -1,0 +1,503 @@
+{% extends "base.html" %}
+{% block title %}OS Hardening{% endblock %}
+{% block page_title %}OS Hardening{% endblock %}
+{% block content %}
+<style>
+.hard-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;height:calc(100vh - 108px)}
+.hard-left{overflow-y:auto;display:flex;flex-direction:column}
+.hard-right{display:flex;flex-direction:column;gap:8px}
+.hgroup-title{font-size:0.52rem;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;padding:6px 14px;background:rgba(0,0,0,0.25);border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:6px}
+.hgroup-title::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:currentColor;opacity:0.6}
+.hgroup-title.firewall{color:var(--cyan)}
+.hgroup-title.access{color:var(--green)}
+.hgroup-title.network{color:var(--yellow)}
+.hgroup-title.services{color:var(--orange)}
+.hgroup-title.filesystem{color:var(--purple)}
+.hctrl{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:1px solid var(--border2);transition:background 0.1s;cursor:pointer}
+.hctrl:hover{background:rgba(0,229,255,0.025)}
+.hctrl:last-child{border-bottom:none}
+.hctrl-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+.hctrl-name{font-size:0.65rem;color:var(--text1);font-weight:500}
+.hctrl-why{font-size:0.55rem;color:var(--text3);margin-top:1px;line-height:1.3}
+.hctrl-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.hc-sw{position:relative;display:inline-block;width:34px;height:18px;flex-shrink:0}
+.hc-sw input{opacity:0;width:0;height:0}
+.slider{position:absolute;inset:0;border-radius:18px;cursor:pointer;background:var(--bg4);border:1px solid var(--border);transition:all 0.2s}
+.slider::before{content:'';position:absolute;height:12px;width:12px;left:2px;bottom:2px;border-radius:50%;background:var(--text3);transition:all 0.2s}
+.hc-sw input:checked + .slider{background:rgba(0,229,255,0.2);border-color:var(--cyan)}
+.hc-sw input:checked + .slider::before{transform:translateX(16px);background:var(--cyan);box-shadow:0 0 6px var(--cyan)}
+.hc-status{font-size:0.56rem;font-weight:700;padding:2px 8px;border-radius:3px;min-width:72px;text-align:center;letter-spacing:0.04em;white-space:nowrap}
+.hc-status.done{color:var(--green);background:rgba(0,230,118,0.1);border:1px solid rgba(0,230,118,0.25)}
+.hc-status.not-done{color:var(--red);background:rgba(255,23,68,0.08);border:1px solid rgba(255,23,68,0.2)}
+.hc-status.checking{color:var(--yellow);background:rgba(255,215,64,0.08);border:1px solid rgba(255,215,64,0.2);animation:blink 1s infinite}
+.hc-status.syncing{color:var(--cyan);background:rgba(0,229,255,0.06);border:1px solid rgba(0,229,255,0.2);animation:blink 0.7s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.5}}
+.console-wrap{flex:1;display:flex;flex-direction:column;background:var(--bg0);border:1px solid var(--border);border-radius:8px;overflow:hidden;position:relative;min-height:0}
+.console-wrap::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,var(--cyan),transparent)}
+.console-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:rgba(0,0,0,0.3);border-bottom:1px solid var(--border2);flex-shrink:0}
+.console-title{font-size:0.65rem;font-weight:600;color:var(--text1);display:flex;align-items:center;gap:6px}
+.c-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+#console{flex:1;overflow-y:auto;padding:10px 14px;font-family:'Courier New',monospace;font-size:0.62rem;line-height:1.7;color:#7a8fa8}
+#console::-webkit-scrollbar{width:3px}
+#console::-webkit-scrollbar-thumb{background:var(--border)}
+.audit-sum{background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;flex-shrink:0}
+.audit-bar{height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;margin:6px 0}
+.audit-bar-fill{height:100%;border-radius:3px;transition:width 0.5s;background:linear-gradient(90deg,var(--red),var(--yellow),var(--green))}
+.ufw-warn{background:rgba(255,215,64,0.05);border:1px solid rgba(255,215,64,0.2);border-radius:6px;padding:7px 12px;margin-bottom:10px;font-size:0.6rem;color:var(--yellow);display:flex;align-items:flex-start;gap:8px;flex-shrink:0}
+.sync-banner{background:rgba(0,229,255,0.05);border:1px solid rgba(0,229,255,0.2);border-radius:6px;padding:6px 12px;margin-bottom:8px;font-size:0.6rem;color:var(--cyan);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.sync-spinner{width:10px;height:10px;border:2px solid rgba(0,229,255,0.2);border-top-color:var(--cyan);border-radius:50%;animation:spin 0.8s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+
+<div class="ufw-warn">
+  <span style="font-size:0.9rem;flex-shrink:0">&#9888;</span>
+  <span><strong>Safe order:</strong> 1. Enable UFW &rarr; 2. Allow SSH from Lab Network &rarr; 3. Allow Web GUI. Localhost is always protected automatically.</span>
+</div>
+<div class="sync-banner" id="sync-banner">
+  <div class="sync-spinner" id="sync-spinner"></div>
+  <span id="sync-msg">Auto-syncing all controls with real system state...</span>
+</div>
+
+<div class="hard-grid">
+  <div class="hard-left">
+    <div class="card" style="margin-bottom:0;overflow:hidden;flex:1">
+      <div class="card-h">
+        <h3>CIS Hardening Controls</h3>
+        <div style="display:flex;gap:6px">
+          <button onclick="syncAllControls()" class="btn btn-s btn-sm">&#8635; Re-Sync</button>
+          <button onclick="auditAll()" class="btn btn-p btn-sm">&#9654; Full Audit</button>
+        </div>
+      </div>
+
+      <div class="hgroup-title firewall">Firewall</div>
+      {% for ctrl_id, ctrl_name, ctrl_why in [
+        ('ufw-enable','Enable UFW Firewall (default deny)','Blocks all unauthorized inbound connections. Without this, every port is reachable by anyone on the network.'),
+        ('ufw-ssh','Allow SSH from Lab Network (10.10.10.0/24)','Permits authorized remote management while UFW is active. Without this rule, SSH is blocked after enabling UFW.'),
+        ('ufw-web','Allow Web GUI from Lab Network (port 5000)','Keeps the WideWolf web interface reachable after UFW is enabled. Without this, the GUI locks you out.')
+      ] %}
+      <div class="hctrl" data-ctrl="{{ ctrl_id }}" onclick="showWhyAlert('{{ ctrl_id }}')">
+        <div class="hctrl-left">
+          <label class="hc-sw" onclick="event.stopPropagation()"><input type="checkbox" id="cb-{{ ctrl_id }}" {% if harden_state.get(ctrl_id) %}checked{% endif %} onchange="applyCtrl('{{ ctrl_id }}',this.checked)"><span class="slider"></span></label>
+          <div>
+            <div class="hctrl-name">{{ ctrl_name }}</div>
+            <div class="hctrl-why">{{ ctrl_why }}</div>
+          </div>
+        </div>
+        <div class="hctrl-right">
+          <span class="hc-status syncing" id="st-{{ ctrl_id }}">&#8635; SYNC</span>
+        </div>
+      </div>
+      {% endfor %}
+
+      <div class="hgroup-title access">Access Control</div>
+      {% for ctrl_id, ctrl_name, ctrl_why in [
+        ('ssh-root','Disable root SSH login','Direct root login over SSH is a major attack vector. Attackers brute-force root credentials. Disable it and use sudo instead.'),
+        ('ssh-password','SSH key-based auth only','Passwords can be guessed or brute-forced. Key-based auth requires physical possession of the private key — exponentially harder to crack.'),
+        ('password-policy','Strong password policy (min 12 chars)','Short passwords are cracked in seconds with modern hardware. A 12-character minimum with complexity rules makes brute-force attacks impractical.'),
+        ('login-timeout','Auto-logout after 300s inactivity','Unattended sessions are a physical security risk. Auto-logout closes sessions that an attacker could hijack if left open.')
+      ] %}
+      <div class="hctrl" data-ctrl="{{ ctrl_id }}" onclick="showWhyAlert('{{ ctrl_id }}')">
+        <div class="hctrl-left">
+          <label class="hc-sw" onclick="event.stopPropagation()"><input type="checkbox" id="cb-{{ ctrl_id }}" {% if harden_state.get(ctrl_id) %}checked{% endif %} onchange="applyCtrl('{{ ctrl_id }}',this.checked)"><span class="slider"></span></label>
+          <div>
+            <div class="hctrl-name">{{ ctrl_name }}</div>
+            <div class="hctrl-why">{{ ctrl_why }}</div>
+          </div>
+        </div>
+        <div class="hctrl-right">
+          <span class="hc-status syncing" id="st-{{ ctrl_id }}">&#8635; SYNC</span>
+        </div>
+      </div>
+      {% endfor %}
+
+      <div class="hgroup-title network">Network</div>
+      {% for ctrl_id, ctrl_name, ctrl_why in [
+        ('icmp-disable','Disable ICMP redirects','ICMP redirect messages can be used to poison routing tables and perform man-in-the-middle attacks. Disabling them prevents this class of attack.'),
+        ('ip-forward','Disable IP forwarding','IP forwarding turns the host into a router, potentially allowing traffic to bypass firewall rules. Disable unless the system is intentionally a router.')
+      ] %}
+      <div class="hctrl" data-ctrl="{{ ctrl_id }}" onclick="showWhyAlert('{{ ctrl_id }}')">
+        <div class="hctrl-left">
+          <label class="hc-sw" onclick="event.stopPropagation()"><input type="checkbox" id="cb-{{ ctrl_id }}" {% if harden_state.get(ctrl_id) %}checked{% endif %} onchange="applyCtrl('{{ ctrl_id }}',this.checked)"><span class="slider"></span></label>
+          <div>
+            <div class="hctrl-name">{{ ctrl_name }}</div>
+            <div class="hctrl-why">{{ ctrl_why }}</div>
+          </div>
+        </div>
+        <div class="hctrl-right">
+          <span class="hc-status syncing" id="st-{{ ctrl_id }}">&#8635; SYNC</span>
+        </div>
+      </div>
+      {% endfor %}
+
+      <div class="hgroup-title services">Unnecessary Services</div>
+      {% for ctrl_id, ctrl_name, ctrl_why in [
+        ('disable-avahi','Disable Avahi/mDNS daemon','Avahi broadcasts device info on the local network, enabling service discovery by attackers. Disable it unless you need zero-conf networking.'),
+        ('disable-cups','Disable CUPS print service','CUPS has a history of critical CVEs. If this system is not a print server, running CUPS is unnecessary attack surface.'),
+        ('disable-bluetooth','Disable Bluetooth service','Bluetooth has numerous known vulnerabilities (BlueBorne, BIAS, KNOB). Disable it on servers and appliances that do not need it.'),
+        ('auto-updates','Enable automatic security updates','Unpatched systems are the #1 attack vector. Automatic updates ensure critical CVE patches are applied without manual intervention.')
+      ] %}
+      <div class="hctrl" data-ctrl="{{ ctrl_id }}" onclick="showWhyAlert('{{ ctrl_id }}')">
+        <div class="hctrl-left">
+          <label class="hc-sw" onclick="event.stopPropagation()"><input type="checkbox" id="cb-{{ ctrl_id }}" {% if harden_state.get(ctrl_id) %}checked{% endif %} onchange="applyCtrl('{{ ctrl_id }}',this.checked)"><span class="slider"></span></label>
+          <div>
+            <div class="hctrl-name">{{ ctrl_name }}</div>
+            <div class="hctrl-why">{{ ctrl_why }}</div>
+          </div>
+        </div>
+        <div class="hctrl-right">
+          <span class="hc-status syncing" id="st-{{ ctrl_id }}">&#8635; SYNC</span>
+        </div>
+      </div>
+      {% endfor %}
+
+      <div class="hgroup-title filesystem">File System</div>
+      {% for ctrl_id, ctrl_name, ctrl_why in [
+        ('tmp-noexec','Mount /tmp with noexec','Attackers often drop malicious binaries in /tmp and execute them. The noexec flag prevents any binary from running directly from /tmp.'),
+        ('core-dumps','Disable core dumps','Core dumps can expose sensitive data including passwords and encryption keys from memory. Disabling them prevents this data leakage.')
+      ] %}
+      <div class="hctrl" data-ctrl="{{ ctrl_id }}" onclick="showWhyAlert('{{ ctrl_id }}')">
+        <div class="hctrl-left">
+          <label class="hc-sw" onclick="event.stopPropagation()"><input type="checkbox" id="cb-{{ ctrl_id }}" {% if harden_state.get(ctrl_id) %}checked{% endif %} onchange="applyCtrl('{{ ctrl_id }}',this.checked)"><span class="slider"></span></label>
+          <div>
+            <div class="hctrl-name">{{ ctrl_name }}</div>
+            <div class="hctrl-why">{{ ctrl_why }}</div>
+          </div>
+        </div>
+        <div class="hctrl-right">
+          <span class="hc-status syncing" id="st-{{ ctrl_id }}">&#8635; SYNC</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="hard-right">
+    <div class="console-wrap">
+      <div class="console-hdr">
+        <div class="console-title"><div class="c-dot"></div>Live Console</div>
+        <div style="display:flex;gap:6px">
+          <button onclick="clearConsole()" class="btn btn-s btn-sm">Clear</button>
+          <button onclick="auditAll()" class="btn btn-p btn-sm">&#9654; Full Audit</button>
+        </div>
+      </div>
+      <div id="console">
+        <span style="color:#00e676">admin@widewolf:~$</span> <span style="color:#5a6a80">// WideWolf Hardening Console</span><br>
+        <span style="color:#5a6a80">Auto-syncing all controls with real system state on load...</span><br>
+        <span style="color:#5a6a80">Click any control row to see WHY it matters.</span><br>
+        <span style="color:rgba(0,229,255,0.2)">-----------------------------------------------------------</span><br>
+      </div>
+    </div>
+    <div class="audit-sum" id="audit-summary" style="display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <span style="font-size:0.62rem;font-weight:600;color:var(--text1)">Audit Summary</span>
+        <span style="font-size:1.3rem;font-weight:700;font-family:monospace;color:var(--cyan)" id="audit-pct">0%</span>
+      </div>
+      <div class="audit-bar"><div class="audit-bar-fill" id="audit-bar" style="width:0%"></div></div>
+      <div style="display:flex;justify-content:space-between;font-size:0.58rem;margin-top:4px">
+        <span><span id="audit-done" style="color:var(--green);font-weight:700">0</span> <span style="color:var(--text3)">hardened</span></span>
+        <span><span id="audit-fail" style="color:var(--red);font-weight:700">0</span> <span style="color:var(--text3)">pending</span></span>
+        <span><span id="audit-total" style="color:var(--text2)">0</span> <span style="color:var(--text3)">total</span></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Why Alert Modal -->
+<div id="why-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);align-items:center;justify-content:center">
+  <div style="background:#111820;border:1px solid var(--border);border-radius:10px;padding:24px 28px;max-width:480px;width:90%;position:relative;box-shadow:0 0 40px rgba(0,0,0,0.6)">
+    <div style="position:absolute;top:0;left:0;right:0;height:2px;border-radius:10px 10px 0 0;background:linear-gradient(90deg,transparent,var(--cyan),transparent)"></div>
+    <div style="display:flex;align-items:flex-start;gap:14px">
+      <div id="why-icon" style="font-size:1.8rem;flex-shrink:0;margin-top:2px">&#9888;</div>
+      <div style="flex:1">
+        <div id="why-title" style="font-size:0.8rem;font-weight:700;color:var(--text1);margin-bottom:6px"></div>
+        <div id="why-status-line" style="margin-bottom:10px"></div>
+        <div id="why-reason" style="font-size:0.68rem;color:var(--text2);line-height:1.6;margin-bottom:12px"></div>
+        <div id="why-proof" style="font-size:0.6rem;font-family:monospace;background:var(--bg3);border:1px solid var(--border2);border-radius:4px;padding:8px 10px;color:var(--cyan);line-height:1.5;margin-bottom:14px;display:none"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button id="why-toggle-btn" onclick="toggleFromModal()" class="btn btn-p btn-sm" style="min-width:100px"></button>
+          <button onclick="closeWhyModal()" class="btn btn-s btn-sm">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var con = document.getElementById('console');
+var _currentModalCtrl = null;
+
+// Per-control metadata: why it matters
+var CTRL_META = {
+  'ufw-enable':       {name:'Enable UFW Firewall', why:'Blocks all unauthorized inbound connections. Without this, every port is reachable by anyone on the network.', icon:'&#128274;'},
+  'ufw-ssh':          {name:'Allow SSH from Lab Network', why:'Permits authorized remote management while UFW is active. Without this rule, SSH is blocked after enabling UFW.', icon:'&#128274;'},
+  'ufw-web':          {name:'Allow Web GUI (port 5000)', why:'Keeps the WideWolf web interface reachable after UFW is enabled. Without this, the GUI locks you out.', icon:'&#128274;'},
+  'ssh-root':         {name:'Disable root SSH login', why:'Direct root login over SSH is a major attack vector. Attackers brute-force root credentials. Disable it and use sudo instead.', icon:'&#128272;'},
+  'ssh-password':     {name:'SSH key-based auth only', why:'Passwords can be guessed or brute-forced. Key-based auth requires physical possession of the private key — exponentially harder to crack.', icon:'&#128272;'},
+  'password-policy':  {name:'Strong password policy', why:'Short passwords are cracked in seconds with modern hardware. A 12-character minimum with complexity rules makes brute-force attacks impractical.', icon:'&#128272;'},
+  'login-timeout':    {name:'Auto-logout after 300s', why:'Unattended sessions are a physical security risk. Auto-logout closes sessions that an attacker could hijack if left open.', icon:'&#9201;'},
+  'icmp-disable':     {name:'Disable ICMP redirects', why:'ICMP redirect messages can be used to poison routing tables and perform man-in-the-middle attacks. Disabling them prevents this class of attack.', icon:'&#127760;'},
+  'ip-forward':       {name:'Disable IP forwarding', why:'IP forwarding turns the host into a router, potentially allowing traffic to bypass firewall rules. Disable unless the system is intentionally a router.', icon:'&#127760;'},
+  'disable-avahi':    {name:'Disable Avahi/mDNS', why:'Avahi broadcasts device info on the local network, enabling service discovery by attackers. Disable it unless you need zero-conf networking.', icon:'&#128268;'},
+  'disable-cups':     {name:'Disable CUPS print service', why:'CUPS has a history of critical CVEs. If this system is not a print server, running CUPS is unnecessary attack surface.', icon:'&#128268;'},
+  'disable-bluetooth':{name:'Disable Bluetooth', why:'Bluetooth has numerous known vulnerabilities (BlueBorne, BIAS, KNOB). Disable it on servers and appliances that do not need it.', icon:'&#128268;'},
+  'auto-updates':     {name:'Automatic security updates', why:'Unpatched systems are the #1 attack vector. Automatic updates ensure critical CVE patches are applied without manual intervention.', icon:'&#128260;'},
+  'tmp-noexec':       {name:'Mount /tmp with noexec', why:'Attackers often drop malicious binaries in /tmp and execute them. The noexec flag prevents any binary from running directly from /tmp.', icon:'&#128196;'},
+  'core-dumps':       {name:'Disable core dumps', why:'Core dumps can expose sensitive data including passwords and encryption keys from memory. Disabling them prevents this data leakage.', icon:'&#128196;'}
+};
+
+// Proof cache: ctrl -> {isDone, output}
+var _proofCache = {};
+
+function clog(text, color) { var d = document.createElement('div'); d.style.color = color || '#7a8fa8'; d.textContent = text; con.appendChild(d); con.scrollTop = con.scrollHeight; }
+function clogHtml(html) { var d = document.createElement('div'); d.innerHTML = html; con.appendChild(d); con.scrollTop = con.scrollHeight; }
+function clearConsole() { con.innerHTML = '<span style="color:#00e676">admin@widewolf:~$</span> <span style="color:#5a6a80">Console cleared.</span><br>'; }
+function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function setStatus(ctrl, cls, text) { var el = document.getElementById('st-' + ctrl); if (el) { el.className = 'hc-status ' + cls; el.innerHTML = text; } }
+function setCheckbox(ctrl, val) { var cb = document.getElementById('cb-' + ctrl); if (cb) cb.checked = val; }
+
+function checkIsDone(ctrl, output) {
+  if (ctrl === 'ufw-enable') return output.indexOf('Status: active') >= 0;
+  if (ctrl === 'ufw-ssh') return output.indexOf('22') >= 0 && output.indexOf('ALLOW') >= 0;
+  if (ctrl === 'ufw-web') return output.indexOf('5000') >= 0 && output.indexOf('ALLOW') >= 0;
+  if (ctrl === 'ssh-root') return /PermitRootLogin\s+no/i.test(output) || (output.indexOf('no') >= 0 && output.indexOf('PermitRootLogin') >= 0);
+  if (ctrl === 'ssh-password') return /PasswordAuthentication\s+no/i.test(output) || (output.indexOf('no') >= 0 && output.indexOf('PasswordAuthentication') >= 0);
+  if (ctrl === 'password-policy') return output.indexOf('minlen') >= 0 && (output.indexOf('12') >= 0 || output.indexOf('= 12') >= 0);
+  if (ctrl === 'login-timeout') return output.indexOf('TMOUT') >= 0 || output.indexOf('300') >= 0;
+  if (ctrl === 'icmp-disable') return output.indexOf('= 0') >= 0 || output.indexOf('=0') >= 0;
+  if (ctrl === 'ip-forward') return output.indexOf('= 0') >= 0 || output.indexOf('=0') >= 0;
+  if (ctrl.indexOf('disable-') === 0) return output.indexOf('inactive') >= 0 || output.indexOf('masked') >= 0 || output.indexOf('not-found') >= 0;
+  if (ctrl === 'auto-updates') return output.indexOf('Unattended-Upgrade') >= 0 || output.indexOf('"1"') >= 0;
+  if (ctrl === 'tmp-noexec') return output.indexOf('noexec') >= 0;
+  if (ctrl === 'core-dumps') return output.indexOf('hard core 0') >= 0 || output.indexOf('core 0') >= 0;
+  return false;
+}
+
+// ─── AUTO-SYNC ON PAGE LOAD ──────────────────────────────────────────────────
+function syncAllControls() {
+  var ctrls = Array.from(document.querySelectorAll('.hctrl[data-ctrl]')).map(function(el){ return el.getAttribute('data-ctrl'); });
+  var banner = document.getElementById('sync-banner');
+  var syncMsg = document.getElementById('sync-msg');
+  var spinner = document.getElementById('sync-spinner');
+  banner.style.display = 'flex';
+  spinner.style.display = 'block';
+  clogHtml('<span style="color:rgba(0,229,255,0.3)">-----------------------------------------------------------</span>');
+  clogHtml('<span style="color:#00e676">admin@widewolf:~$</span> <span style="color:#00e5ff">widewolf-sync --auto-detect-all-controls</span>');
+  var i = 0, doneCount = 0;
+  function next() {
+    if (i >= ctrls.length) {
+      spinner.style.display = 'none';
+      syncMsg.textContent = 'Sync complete — ' + doneCount + '/' + ctrls.length + ' controls active on system.';
+      setTimeout(function(){ banner.style.display = 'none'; }, 3000);
+      clogHtml('<span style="color:#00e676">  [SYNC DONE] ' + doneCount + '/' + ctrls.length + ' controls confirmed active.</span>');
+      return;
+    }
+    var ctrl = ctrls[i]; i++;
+    syncMsg.textContent = 'Checking [' + i + '/' + ctrls.length + '] ' + ctrl + '...';
+    setStatus(ctrl, 'syncing', '&#8635; SYNC');
+    fetch('/api/hardening/verify', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({control: ctrl})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      var output = (d.output || '').trim();
+      var isDone = checkIsDone(ctrl, output);
+      _proofCache[ctrl] = {isDone: isDone, output: output};
+      if (isDone) {
+        doneCount++;
+        setStatus(ctrl, 'done', '&#10003; DONE');
+        setCheckbox(ctrl, true);
+        clogHtml('<span style="color:#00e5ff">[SYNC]</span> <span style="color:#e8edf5">' + escHtml(ctrl) + '</span> <span style="color:#00e676">ENABLED</span> <span style="color:#5a6a80">-- ' + escHtml(output.substring(0,60)) + '</span>');
+      } else {
+        setStatus(ctrl, 'not-done', '&#10007; NOT DONE');
+        setCheckbox(ctrl, false);
+        clogHtml('<span style="color:#00e5ff">[SYNC]</span> <span style="color:#e8edf5">' + escHtml(ctrl) + '</span> <span style="color:#ff5252">DISABLED</span> <span style="color:#5a6a80">-- ' + escHtml(output.substring(0,60)) + '</span>');
+      }
+      setTimeout(next, 150);
+    }).catch(function(){
+      _proofCache[ctrl] = {isDone: false, output: 'Error'};
+      setStatus(ctrl, 'not-done', '&#10007; ERROR');
+      setTimeout(next, 150);
+    });
+  }
+  next();
+}
+
+// ─── APPLY CONTROL ───────────────────────────────────────────────────────────
+function applyCtrl(ctrl, enabled) {
+  var lbl = document.querySelector('[data-ctrl="' + ctrl + '"] .hctrl-name');
+  var ctrlName = lbl ? lbl.textContent : ctrl;
+  var cb = document.getElementById('cb-' + ctrl);
+  clogHtml('<span style="color:rgba(0,229,255,0.3)">-----------------------------------------------------------</span>');
+  clogHtml('<span style="color:#00e676">admin@widewolf:~$</span> <span style="color:#ffd740">widewolf-harden --' + (enabled?'enable':'disable') + ' ' + escHtml(ctrl) + '</span>');
+  setStatus(ctrl, 'checking', '&#9654; RUNNING');
+  if (cb) cb.disabled = true;
+  fetch('/api/hardening/apply', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({control: ctrl, enabled: enabled})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (cb) cb.disabled = false;
+    if (d.command) clogHtml('<span style="color:#00e5ff">  $ ' + escHtml(d.command) + '</span>');
+    if (d.success) {
+      clogHtml('<span style="color:#00e676">  [OK] exit code: ' + (d.exit_code||0) + '</span>');
+      if (d.output) { var lines = d.output.split('\n'); for (var i=0;i<Math.min(lines.length,4);i++){ if(lines[i].trim()) clogHtml('<span style="color:#5a7a5a">      ' + escHtml(lines[i]) + '</span>'); } }
+      clogHtml('<span style="color:#ffd740">  [VERIFY] Confirming real system state...</span>');
+      verifyAndSync(ctrl);
+    } else {
+      clogHtml('<span style="color:#ff5252">  [FAIL] ' + escHtml(d.message||'Unknown error') + '</span>');
+      setStatus(ctrl, 'not-done', '&#10007; NOT DONE');
+      if (cb) cb.checked = !enabled;
+    }
+  }).catch(function(e){
+    if (cb) cb.disabled = false;
+    clogHtml('<span style="color:#ff5252">  [ERROR] ' + escHtml(e.message) + '</span>');
+    setStatus(ctrl, 'not-done', '&#10007; NOT DONE');
+    if (cb) cb.checked = !enabled;
+  });
+}
+
+function verifyAndSync(ctrl) {
+  fetch('/api/hardening/verify', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({control: ctrl})
+  }).then(function(r){ return r.json(); }).then(function(d){
+    if (d.command) clogHtml('<span style="color:#5a6a80">  [verify] $ ' + escHtml(d.command) + '</span>');
+    var output = (d.output || '').trim();
+    if (output) { var lines = output.split('\n'); for (var i=0;i<Math.min(lines.length,3);i++){ if(lines[i].trim()) clogHtml('<span style="color:#00e5ff">  [PROOF] ' + escHtml(lines[i]) + '</span>'); } }
+    var isDone = checkIsDone(ctrl, output);
+    _proofCache[ctrl] = {isDone: isDone, output: output};
+    if (isDone) {
+      setStatus(ctrl, 'done', '&#10003; DONE');
+      setCheckbox(ctrl, true);
+      clogHtml('<span style="color:#00e676">  [CONFIRMED] Control is ACTIVE on system</span>');
+    } else {
+      setStatus(ctrl, 'not-done', '&#10007; NOT DONE');
+      setCheckbox(ctrl, false);
+      clogHtml('<span style="color:#ff5252">  [WARNING] Control NOT confirmed on system</span>');
+    }
+  }).catch(function(){});
+}
+
+// ─── WHY ALERT MODAL ─────────────────────────────────────────────────────────
+function showWhyAlert(ctrl) {
+  _currentModalCtrl = ctrl;
+  var meta = CTRL_META[ctrl] || {name: ctrl, why: 'No description available.', icon: '&#9432;'};
+  var cache = _proofCache[ctrl];
+  document.getElementById('why-icon').innerHTML = meta.icon;
+  document.getElementById('why-title').textContent = meta.name;
+  document.getElementById('why-reason').textContent = meta.why;
+  var statusLine = document.getElementById('why-status-line');
+  var toggleBtn = document.getElementById('why-toggle-btn');
+  var proofDiv = document.getElementById('why-proof');
+  if (cache) {
+    if (cache.isDone) {
+      statusLine.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:4px;background:rgba(0,230,118,0.1);border:1px solid rgba(0,230,118,0.3);font-size:0.62rem;font-weight:700;color:#00e676">&#10003; CURRENTLY ENABLED ON SYSTEM</span>';
+      toggleBtn.textContent = 'Disable This Control';
+      toggleBtn.style.background = 'rgba(255,23,68,0.1)';
+      toggleBtn.style.borderColor = 'rgba(255,23,68,0.3)';
+      toggleBtn.style.color = '#ff1744';
+    } else {
+      statusLine.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:4px;background:rgba(255,23,68,0.08);border:1px solid rgba(255,23,68,0.2);font-size:0.62rem;font-weight:700;color:#ff5252">&#10007; NOT ACTIVE ON SYSTEM</span>';
+      toggleBtn.textContent = 'Enable This Control';
+      toggleBtn.style.background = 'rgba(0,230,118,0.1)';
+      toggleBtn.style.borderColor = 'rgba(0,230,118,0.3)';
+      toggleBtn.style.color = '#00e676';
+    }
+    if (cache.output) {
+      proofDiv.style.display = 'block';
+      proofDiv.textContent = '$ verify: ' + cache.output.substring(0, 200);
+    } else {
+      proofDiv.style.display = 'none';
+    }
+  } else {
+    statusLine.innerHTML = '<span style="font-size:0.62rem;color:var(--text3)">Status not yet checked — run Re-Sync first.</span>';
+    toggleBtn.textContent = 'Enable This Control';
+    toggleBtn.style.background = 'rgba(0,230,118,0.1)';
+    toggleBtn.style.borderColor = 'rgba(0,230,118,0.3)';
+    toggleBtn.style.color = '#00e676';
+    proofDiv.style.display = 'none';
+  }
+  var modal = document.getElementById('why-modal');
+  modal.style.display = 'flex';
+}
+
+function closeWhyModal() {
+  document.getElementById('why-modal').style.display = 'none';
+  _currentModalCtrl = null;
+}
+
+function toggleFromModal() {
+  if (!_currentModalCtrl) return;
+  var ctrl = _currentModalCtrl;
+  var cache = _proofCache[ctrl];
+  var newEnabled = cache ? !cache.isDone : true;
+  closeWhyModal();
+  var cb = document.getElementById('cb-' + ctrl);
+  if (cb) cb.checked = newEnabled;
+  applyCtrl(ctrl, newEnabled);
+}
+
+document.getElementById('why-modal').addEventListener('click', function(e){ if(e.target===this) closeWhyModal(); });
+
+// ─── FULL AUDIT ───────────────────────────────────────────────────────────────
+function auditAll() {
+  clogHtml('<span style="color:rgba(0,229,255,0.3)">-----------------------------------------------------------</span>');
+  clogHtml('<span style="color:#00e676">admin@widewolf:~$</span> <span style="color:#fff">widewolf-audit --full-system-check</span>');
+  var ctrls = Array.from(document.querySelectorAll('.hctrl[data-ctrl]')).map(function(el){ return el.getAttribute('data-ctrl'); });
+  var i = 0, doneCount = 0, failCount = 0;
+  function next() {
+    if (i >= ctrls.length) {
+      clogHtml('<span style="color:rgba(0,229,255,0.3)">-----------------------------------------------------------</span>');
+      clogHtml('<span style="color:#fff;font-weight:bold">AUDIT COMPLETE</span>');
+      clogHtml('<span style="color:#00e676">  HARDENED:    ' + doneCount + ' controls applied</span>');
+      clogHtml('<span style="color:#ff5252">  PENDING:     ' + failCount + ' controls not applied</span>');
+      var pct = Math.round((doneCount / ctrls.length) * 100);
+      var sc = pct >= 70 ? '#00e676' : pct >= 40 ? '#ffd740' : '#ff5252';
+      clogHtml('<span style="color:' + sc + '">  SCORE:       ' + pct + '% hardened</span>');
+      document.getElementById('audit-summary').style.display = 'block';
+      document.getElementById('audit-pct').textContent = pct + '%';
+      document.getElementById('audit-pct').style.color = sc;
+      document.getElementById('audit-bar').style.width = pct + '%';
+      document.getElementById('audit-done').textContent = doneCount;
+      document.getElementById('audit-fail').textContent = failCount;
+      document.getElementById('audit-total').textContent = ctrls.length;
+      return;
+    }
+    var ctrl = ctrls[i]; i++;
+    var lbl = document.querySelector('[data-ctrl="' + ctrl + '"] .hctrl-name');
+    var ctrlName = lbl ? lbl.textContent.trim() : ctrl;
+    setStatus(ctrl, 'syncing', '...');
+    clogHtml('<span style="color:#00e5ff">[' + i + '/' + ctrls.length + ']</span> <span style="color:#e8edf5">' + escHtml(ctrlName) + '</span>');
+    fetch('/api/hardening/verify', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({control: ctrl})
+    }).then(function(r){ return r.json(); }).then(function(d){
+      var output = (d.output || '').trim();
+      var isDone = checkIsDone(ctrl, output);
+      _proofCache[ctrl] = {isDone: isDone, output: output};
+      if (isDone) {
+        doneCount++;
+        setStatus(ctrl, 'done', '&#10003; DONE');
+        setCheckbox(ctrl, true);
+        clogHtml('<span style="color:#00e676">  HARDENED</span> <span style="color:#5a6a80">-- ' + escHtml(output.substring(0,80)) + '</span>');
+      } else {
+        failCount++;
+        setStatus(ctrl, 'not-done', '&#10007; NOT DONE');
+        setCheckbox(ctrl, false);
+        clogHtml('<span style="color:#ff5252">  NOT APPLIED</span> <span style="color:#5a6a80">-- ' + escHtml(output.substring(0,80)) + '</span>');
+      }
+      setTimeout(next, 200);
+    }).catch(function(){
+      failCount++;
+      setStatus(ctrl, 'not-done', '&#10007; ERROR');
+      setTimeout(next, 200);
+    });
+  }
+  next();
+}
+
+// ─── AUTO-SYNC ON PAGE LOAD ───────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', function(){ syncAllControls(); });
+</script>
+{% endblock %}

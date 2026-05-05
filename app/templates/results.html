@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Scan Results{% endblock %}
+{% block head_extra %}<meta http-equiv="refresh" content="5">{% endblock %}
+{% block page_title %}Scan Results{% endblock %}
+{% block content %}
+<style>
+.tag-auto{background:rgba(180,0,255,0.18);color:#c77dff;padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:700;letter-spacing:0.5px}
+.tag-manual{background:rgba(0,229,255,0.12);color:var(--cyan);padding:2px 8px;border-radius:10px;font-size:0.65rem;font-weight:700;letter-spacing:0.5px}
+</style>
+<div class="card">
+  <div class="card-h">
+    <h3>All Scans (<span id="scan-count">0</span>)</h3>
+    <div style="display:flex;gap:8px;align-items:center">
+      <span id="live-indicator" style="font-size:0.6rem;color:var(--green);display:flex;align-items:center;gap:4px"><span style="width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;animation:pulse 2s infinite"></span>LIVE</span>
+      <a href="/scan" class="btn btn-p btn-sm">+ New Scan</a>
+    </div>
+  </div>
+  <div class="card-b" style="padding:0">
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Target</th><th>Type</th><th>Timing</th><th>Source</th><th>Status</th><th>Duration</th><th>Date</th><th>Actions</th></tr></thead>
+      <tbody id="scans-tbody">
+        <tr><td colspan="9" style="text-align:center;color:var(--text3);padding:20px">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function fmtTime(val){
+  if(!val) return '—';
+  try{
+    var s=val.replace('T',' ').split('.')[0];
+    var parts=s.split(' ');
+    var d=parts[0].split('-');
+    var months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var mon=months[parseInt(d[1])-1];
+    var tp=parts[1].split(':');
+    var h=parseInt(tp[0]),m=tp[1],ap=h>=12?'PM':'AM';
+    h=h%12||12;
+    return mon+' '+d[2]+', '+d[0]+' '+h+':'+m+' '+ap;
+  }catch(e){return val;}
+}
+function deleteScan(scanId, btn){
+  if(!confirm('Delete scan #'+scanId+'? This cannot be undone.')) return;
+  btn.disabled=true; btn.textContent='...';
+  fetch('/api/scan/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scan_id:scanId})})
+  .then(r=>r.json()).then(function(d){
+    if(d.success){var row=btn.closest('tr');row.style.transition='opacity 0.3s';row.style.opacity='0';setTimeout(function(){row.remove();updateCount();},300);}
+    else{btn.disabled=false;btn.textContent='Delete';alert(d.error||'Could not delete scan');}
+  }).catch(function(){btn.disabled=false;btn.textContent='Delete';alert('Request failed');});
+}
+function updateCount(){
+  var rows=document.querySelectorAll('#scans-tbody tr[data-id]');
+  document.getElementById('scan-count').textContent=rows.length;
+}
+function loadScans(){
+  fetch('/api/scan/results')
+  .then(r=>r.json())
+  .then(function(data){
+    var scans=data.scans||[];
+    var tbody=document.getElementById('scans-tbody');
+    if(scans.length===0){
+      tbody.innerHTML='<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:20px">No scans yet. <a href="/scan">Start your first scan</a></td></tr>';
+      document.getElementById('scan-count').textContent='0';
+      return;
+    }
+    document.getElementById('scan-count').textContent=scans.length;
+    var html='';
+    scans.forEach(function(s){
+      var src=s.auto_mode?'<span class="tag-auto">AUTO</span>':'<span class="tag-manual">MANUAL</span>';
+      var dur=s.duration_seconds?s.duration_seconds+'s':'—';
+      html+='<tr data-id="'+s.id+'">';
+      html+='<td>'+s.id+'</td>';
+      html+='<td style="color:var(--cyan);font-family:monospace">'+s.target+'</td>';
+      html+='<td>'+s.scan_type+'</td>';
+      html+='<td>'+s.timing+'</td>';
+      html+='<td>'+src+'</td>';
+      html+='<td><span class="badge b-'+s.status+'">'+s.status+'</span></td>';
+      html+='<td>'+dur+'</td>';
+      html+='<td style="font-size:0.72rem">'+fmtTime(s.created_at)+'</td>';
+      html+='<td style="display:flex;gap:6px;align-items:center">';
+      html+='<a href="/results/'+s.id+'" class="btn btn-s btn-sm">Details</a>';
+      html+='<button class="btn btn-d btn-sm" onclick="deleteScan('+s.id+',this)">Delete</button>';
+      html+='</td></tr>';
+    });
+    tbody.innerHTML=html;
+  }).catch(function(){});
+}
+loadScans();
+setInterval(loadScans, 3000);
+</script>
+{% endblock %}

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WideWolf — Network Intrusion Appliance</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{height:100vh;display:flex;align-items:center;justify-content:center;background:#0a0e14;font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden}
+.bg{position:fixed;inset:0;background:radial-gradient(ellipse at center,#111820 0%,#0a0e14 70%)}
+.grid{position:fixed;inset:0;background-image:linear-gradient(rgba(0,229,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,229,255,0.03) 1px,transparent 1px);background-size:40px 40px;animation:drift 20s linear infinite}
+@keyframes drift{from{transform:translate(0,0)}to{transform:translate(40px,40px)}}
+.wrap{position:relative;text-align:center;z-index:1}
+h1{font-size:2.5rem;color:#00e5ff;font-weight:700;letter-spacing:3px;margin-bottom:6px;text-shadow:0 0 30px rgba(0,229,255,0.3)}
+.sub{font-size:0.7rem;color:#5a6a80;text-transform:uppercase;letter-spacing:3px;margin-bottom:30px}
+.enter{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.3);border-radius:6px;color:#00e5ff;font-size:0.85rem;font-weight:700;text-decoration:none;transition:all 0.2s;letter-spacing:1px}
+.enter:hover{background:#00e5ff;color:#000;box-shadow:0 0 24px rgba(0,229,255,0.35)}
+.footer{margin-top:30px;font-size:0.55rem;color:#5a6a80;letter-spacing:0.5px}
+.warn{margin-top:12px;padding:8px 16px;border:1px solid rgba(255,152,0,0.3);border-radius:4px;background:rgba(255,152,0,0.05);font-size:0.55rem;color:#ff9800;display:inline-block}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="grid"></div>
+<div class="wrap">
+  <h1>WideWolf</h1>
+  <div class="sub">Network Intrusion Testing Appliance</div>
+  <a href="/login" class="enter">&#9654; ENTER SYSTEM</a>
+  <div class="footer">Appliance IP: {{ local_ip }} &mdash; ITP 258 Final Project</div>
+  <div class="warn">FOR EDUCATIONAL USE ONLY — Authorized Lab Environment</div>
+</div>
+</body>
+</html>

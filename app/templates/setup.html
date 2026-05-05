@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WideWolf — Initial Setup</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{height:100vh;display:flex;align-items:center;justify-content:center;background:#0a0e14;font-family:'Segoe UI',system-ui,sans-serif}
+.box{width:360px;background:#111820;border:1px solid #2a3a4e;border-radius:10px;padding:30px}
+.logo{text-align:center;margin-bottom:20px}
+.logo h1{font-size:1.3rem;color:#00e5ff;letter-spacing:2px}
+.logo .sub{font-size:0.6rem;color:#00e676;text-transform:uppercase;letter-spacing:2px;margin-top:3px}
+.desc{font-size:0.7rem;color:#8a9bb8;line-height:1.6;margin-bottom:18px;text-align:center}
+.fg{margin-bottom:14px}
+.fl{display:block;font-size:0.6rem;color:#5a6a80;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.fi{width:100%;padding:9px 11px;background:#1a2332;border:1px solid #2a3a4e;border-radius:4px;color:#e4e8ef;font-size:0.8rem;font-family:inherit}
+.fi:focus{outline:none;border-color:#00e5ff}
+.btn{width:100%;padding:10px;background:rgba(0,230,118,0.1);border:1px solid rgba(0,230,118,0.3);border-radius:5px;color:#00e676;font-size:0.8rem;font-weight:700;cursor:pointer;transition:all 0.2s;margin-top:6px;font-family:inherit}
+.btn:hover{background:#00e676;color:#000}
+.err{background:rgba(255,82,82,0.1);border:1px solid rgba(255,82,82,0.3);border-radius:4px;padding:7px 10px;font-size:0.65rem;color:#ff5252;margin-bottom:12px}
+.req{font-size:0.6rem;color:#5a6a80;margin-top:6px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="logo"><h1>WideWolf</h1><div class="sub">First-Time Setup</div></div>
+  <div class="desc">Welcome! Create an admin password to secure this appliance. This password will be required for all future logins.</div>
+  {% if error %}<div class="err">{{ error }}</div>{% endif %}
+  <form method="POST" action="/setup">
+    <div class="fg"><label class="fl">New Password</label><input class="fi" type="password" name="password" autofocus required></div>
+    <div class="fg"><label class="fl">Confirm Password</label><input class="fi" type="password" name="confirm" required></div>
+    <button type="submit" class="btn">&#10003; CREATE ADMIN ACCOUNT</button>
+  </form>
+  <div class="req">Requirements: minimum 8 characters. Username will be <strong style="color:#00e5ff">admin</strong>.</div>
+</div>
+</body>
+</html>

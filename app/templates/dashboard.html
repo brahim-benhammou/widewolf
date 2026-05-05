@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block head_extra %}<meta http-equiv="refresh" content="10">{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block content %}
+<style>
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+.stat{background:linear-gradient(135deg,var(--bg3),var(--bg2));border:1px solid var(--border);border-radius:8px;padding:12px 14px;position:relative;overflow:hidden;transition:border-color 0.2s,transform 0.15s;cursor:default}
+.stat:hover{border-color:rgba(0,229,255,0.3);transform:translateY(-1px)}
+.stat-accent{position:absolute;top:0;left:0;width:3px;height:100%;border-radius:8px 0 0 8px}
+.stat-top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px}
+.stat-ico{width:32px;height:32px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.stat-trend{font-size:0.55rem;padding:2px 5px;border-radius:3px;font-weight:600}
+.stat-val{font-size:1.6rem;font-weight:700;font-family:monospace;line-height:1;margin-bottom:3px}
+.stat-lbl{font-size:0.56rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em}
+.stat-sub{font-size:0.58rem;color:var(--text2);margin-top:4px}
+
+.mid-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:12px}
+.chart-wrap{height:150px;position:relative}
+
+.scan-row{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border2)}
+.scan-row:last-child{border-bottom:none}
+.scan-row:hover{background:rgba(0,229,255,0.025)}
+.scan-target{font-family:monospace;color:var(--cyan);font-size:0.65rem;min-width:90px}
+.scan-type{font-size:0.6rem;color:var(--text2);flex:1}
+.scan-time{font-size:0.58rem;color:var(--text3);min-width:80px;text-align:right}
+
+.quick-form{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:end}
+.section-title{font-size:0.58rem;color:var(--text3);text-transform:uppercase;letter-spacing:0.1em;font-weight:600;margin-bottom:8px}
+</style>
+
+<!-- Stat Cards -->
+<div class="stat-grid">
+  <div class="stat">
+    <div class="stat-accent" style="background:var(--cyan)"></div>
+    <div class="stat-top">
+      <div class="stat-ico" style="background:rgba(0,229,255,0.1);color:var(--cyan)">&#9707;</div>
+      <span class="stat-trend" style="background:rgba(0,229,255,0.1);color:var(--cyan)">TOTAL</span>
+    </div>
+    <div class="stat-val" style="color:var(--cyan)">{{ stats.total_scans }}</div>
+    <div class="stat-lbl">Scans Run</div>
+    <div class="stat-sub">{{ stats.completed_scans }} completed</div>
+  </div>
+  <div class="stat">
+    <div class="stat-accent" style="background:var(--green)"></div>
+    <div class="stat-top">
+      <div class="stat-ico" style="background:rgba(0,230,118,0.1);color:var(--green)">&#9654;</div>
+      <span class="stat-trend" style="background:rgba(0,230,118,0.1);color:var(--green)">LIVE</span>
+    </div>
+    <div class="stat-val" style="color:var(--green)">{{ stats.hosts_discovered }}</div>
+    <div class="stat-lbl">Hosts Found</div>
+    <div class="stat-sub">{{ stats.open_ports }} open ports</div>
+  </div>
+  <div class="stat">
+    <div class="stat-accent" style="background:var(--red)"></div>
+    <div class="stat-top">
+      <div class="stat-ico" style="background:rgba(255,23,68,0.1);color:var(--red)">&#9888;</div>
+      <span class="stat-trend" style="background:rgba(255,23,68,0.1);color:var(--red)">RISK</span>
+    </div>
+    <div class="stat-val" style="color:var(--red)">{{ stats.critical_findings }}</div>
+    <div class="stat-lbl">Critical Findings</div>
+    <div class="stat-sub" style="color:var(--orange)">{{ stats.high_findings }} high severity</div>
+  </div>
+  <div class="stat">
+    <div class="stat-accent" style="background:var(--yellow)"></div>
+    <div class="stat-top">
+      <div class="stat-ico" style="background:rgba(255,215,64,0.1);color:var(--yellow)">&#9741;</div>
+      <span class="stat-trend" style="background:rgba(255,215,64,0.1);color:var(--yellow)">DOCS</span>
+    </div>
+    <div class="stat-val" style="color:var(--yellow)">{{ stats.total_reports or 0 }}</div>
+    <div class="stat-lbl">Reports</div>
+    <div class="stat-sub"><a href="/reports" style="color:var(--text3);font-size:0.58rem">View all</a></div>
+  </div>
+</div>
+
+<!-- Charts Row -->
+<div class="mid-grid">
+  <div class="card">
+    <div class="card-h"><h3>Vulnerability Breakdown</h3></div>
+    <div class="card-b"><div class="chart-wrap"><canvas id="vulnChart"></canvas></div></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h3>7-Day Activity</h3></div>
+    <div class="card-b"><div class="chart-wrap"><canvas id="weekChart"></canvas></div></div>
+  </div>
+  <div class="card">
+    <div class="card-h"><h3>Quick Scan</h3></div>
+    <div class="card-b">
+      <div class="section-title">Target IP</div>
+      <input id="qs-target" class="fc mb-2" value="{{ session.get('target','10.10.10.5') }}" placeholder="10.10.10.x or CIDR">
+      <div class="section-title">Scan Type</div>
+      <select id="qs-type" class="fc mb-3">
+        <option value="service">Service Detection</option>
+        <option value="quick">Quick Scan</option>
+        <option value="full">Full Port Scan</option>
+        <option value="vuln">Vulnerability Scan</option>
+      </select>
+      <button onclick="quickScan()" class="btn btn-p w-full">&#9654; Launch Scan</button>
+      <div id="qs-msg" style="font-size:0.6rem;color:var(--text3);margin-top:6px;text-align:center"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Scans -->
+<div class="card">
+  <div class="card-h">
+    <h3>Recent Scans</h3>
+    <a href="/scan" class="btn btn-p btn-sm">+ New Scan</a>
+  </div>
+  <div style="padding:0">
+    {% if recent_scans %}
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>Target</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Hosts</th>
+          <th>Findings</th>
+          <th>Duration</th>
+          <th>Started</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for s in recent_scans %}
+        <tr>
+          <td class="mono">{{ s.target }}</td>
+          <td style="color:var(--text2);font-size:0.62rem">{{ s.scan_type }}</td>
+          <td><span class="badge b-{{ s.status }}">{{ s.status }}</span></td>
+          <td style="color:var(--text2)">{{ s.hosts_count or '—' }}</td>
+          <td>
+            {% if s.critical_count %}<span class="badge b-critical" style="margin-right:2px">{{ s.critical_count }}C</span>{% endif %}
+            {% if s.high_count %}<span class="badge b-high">{{ s.high_count }}H</span>{% endif %}
+            {% if not s.critical_count and not s.high_count %}<span style="color:var(--text3);font-size:0.6rem">—</span>{% endif %}
+          </td>
+          <td style="color:var(--text3);font-family:monospace;font-size:0.6rem">{{ s.duration_seconds or '—' }}s</td>
+          <td style="color:var(--text3);font-size:0.72rem">{{ s.created_at | fmt_time }}</td>
+          <td><a href="/results/{{ s.id }}" class="btn btn-s btn-sm">View</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="text-align:center;padding:30px;color:var(--text3)">
+      <div style="font-size:2rem;margin-bottom:8px;opacity:0.3">&#9707;</div>
+      <div style="font-size:0.7rem;margin-bottom:8px">No scans yet</div>
+      <a href="/scan" class="btn btn-p btn-sm">Launch First Scan</a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+Chart.defaults.color='#8a9bb8';
+Chart.defaults.borderColor='rgba(0,229,255,0.08)';
+
+fetch('/api/chart/vulnerability-breakdown').then(function(r){return r.json();}).then(function(d){
+  new Chart(document.getElementById('vulnChart'),{
+    type:'doughnut',
+    data:{
+      labels:['Critical','High','Medium','Low','Info'],
+      datasets:[{
+        data:[d.critical||0,d.high||0,d.medium||0,d.low||0,d.info||0],
+        backgroundColor:['rgba(255,23,68,0.85)','rgba(255,109,0,0.85)','rgba(255,215,64,0.85)','rgba(0,230,118,0.85)','rgba(0,229,255,0.85)'],
+        borderWidth:0,borderRadius:2
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'right',labels:{boxWidth:8,padding:8,font:{size:10}}}}}
+  });
+}).catch(function(){});
+
+fetch('/api/chart/weekly-activity').then(function(r){return r.json();}).then(function(d){
+  new Chart(document.getElementById('weekChart'),{
+    type:'bar',
+    data:{
+      labels:d.map(function(x){return x.day.slice(5);}),
+      datasets:[{
+        data:d.map(function(x){return x.count;}),
+        backgroundColor:'rgba(0,229,255,0.2)',
+        borderColor:'rgba(0,229,255,0.6)',
+        borderWidth:1,borderRadius:3
+      }]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1,font:{size:9}},grid:{color:'rgba(0,229,255,0.05)'}},x:{ticks:{font:{size:9}},grid:{display:false}}}}
+  });
+}).catch(function(){});
+
+function quickScan(){
+  var t=document.getElementById('qs-target').value.trim();
+  var st=document.getElementById('qs-type').value;
+  var msg=document.getElementById('qs-msg');
+  if(!t){msg.textContent='Enter a target IP';msg.style.color='var(--red)';return;}
+  msg.textContent='Launching scan...';msg.style.color='var(--cyan)';
+  fetch('/api/scan/start',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({target:t,scan_type:st,timing:'normal',capture_duration:30,interface:'eth0'})
+  }).then(function(r){return r.json();}).then(function(d){
+    if(d.scan_uuid){
+      window.location.href='/scan?uuid='+d.scan_uuid;
+    } else {
+      msg.textContent=d.error||'Failed to start scan';msg.style.color='var(--red)';
+    }
+  }).catch(function(){msg.textContent='Connection error';msg.style.color='var(--red)';});
+}
+</script>
+{% endblock %}

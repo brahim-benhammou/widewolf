@@ -1,0 +1,524 @@
+{% extends "base.html" %}
+{% block title %}Network Scanning{% endblock %}
+{% block page_title %}Network Scanning{% endblock %}
+{% block content %}
+<style>
+/* Layout */
+.scan-wrap{display:grid;grid-template-columns:1fr 340px;gap:14px}
+.scan-left{display:flex;flex-direction:column;gap:12px}
+.scan-right{display:flex;flex-direction:column;gap:12px}
+
+/* Warning */
+.warn-bar{background:rgba(255,152,0,0.06);border:1px solid rgba(255,152,0,0.25);border-radius:6px;padding:8px 12px;display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:0.6rem;color:var(--text2)}
+.warn-bar strong{color:var(--orange)}
+
+/* Config card */
+.cfg-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px}
+.cfg-title{font-size:0.7rem;font-weight:700;color:var(--text1);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.cfg-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.form-row.three{grid-template-columns:1fr 1fr 1fr}
+.fg label{display:block;font-size:0.58rem;font-weight:600;color:var(--text3);margin-bottom:3px;text-transform:uppercase;letter-spacing:0.04em}
+.fg input,.fg select{width:100%;padding:6px 8px;background:var(--bg3);border:1px solid var(--border);border-radius:4px;color:var(--text1);font-size:0.65rem;box-sizing:border-box}
+.fg input:focus,.fg select:focus{outline:none;border-color:var(--cyan)}
+.sel-badge{background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.3);border-radius:4px;padding:5px 8px;font-size:0.6rem;color:var(--cyan);margin-bottom:10px;display:none;font-family:monospace}
+.sel-badge.on{display:block}
+.btn-launch{width:100%;padding:9px;margin-top:4px;font-size:0.7rem;font-weight:600;letter-spacing:0.03em}
+
+/* Progress card */
+.prog-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px;display:none}
+.prog-card.on{display:block}
+.prog-top{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.prog-phase{font-size:0.65rem;font-weight:700;color:var(--cyan);text-transform:uppercase;background:rgba(0,229,255,0.1);padding:2px 8px;border-radius:3px}
+.prog-target{font-size:0.6rem;color:var(--text3);font-family:monospace;flex:1}
+.prog-pct{font-size:0.75rem;font-weight:700;color:var(--green)}
+.prog-track{height:4px;background:var(--bg4);border-radius:2px;overflow:hidden;margin-bottom:6px}
+.prog-fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));border-radius:2px;transition:width 0.4s}
+.prog-msg{font-size:0.6rem;color:var(--text2);margin-bottom:8px;min-height:16px}
+.prog-btns{display:flex;gap:6px}
+.prog-btns button{flex:1;font-size:0.6rem;padding:5px}
+
+/* Results card */
+.res-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.res-head{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.res-head h4{margin:0;font-size:0.7rem;font-weight:700;color:var(--text1);text-transform:uppercase;letter-spacing:0.05em}
+.res-badge{background:rgba(0,229,255,0.1);border:1px solid var(--cyan);border-radius:4px;padding:2px 8px;font-size:0.58rem;color:var(--cyan);font-weight:600}
+.res-body{max-height:340px;overflow-y:auto}
+.res-item{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s}
+.res-item:hover{background:rgba(0,229,255,0.04)}
+.res-ip{font-size:0.72rem;font-weight:700;color:var(--cyan);font-family:monospace}
+.res-type{font-size:0.58rem;color:var(--text3);margin-top:2px}
+.res-time{font-size:0.52rem;color:var(--text4);margin-top:2px}
+.res-st{display:inline-block;font-size:0.52rem;padding:2px 6px;border-radius:3px;margin-top:3px;font-weight:600}
+.res-st.done{background:rgba(76,175,80,0.15);color:var(--green)}
+.res-st.running{background:rgba(0,229,255,0.15);color:var(--cyan)}
+.res-st.error{background:rgba(244,67,54,0.15);color:var(--red)}
+.res-empty{padding:20px;text-align:center;color:var(--text3);font-size:0.62rem}
+
+/* Discovery hosts panel (below config) */
+.hosts-card{background:var(--bg2);border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.hosts-head{padding:10px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.hosts-head h4{margin:0;font-size:0.7rem;font-weight:700;color:var(--text1);text-transform:uppercase;letter-spacing:0.05em}
+.hosts-body{max-height:280px;overflow-y:auto}
+.h-item{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer;transition:all 0.12s;display:flex;align-items:center;gap:10px}
+.h-item:hover{background:rgba(0,229,255,0.05);border-left:3px solid var(--cyan);padding-left:9px}
+.h-item.sel{background:rgba(0,229,255,0.1);border-left:3px solid var(--green);padding-left:9px}
+.h-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;box-shadow:0 0 4px var(--green)}
+.h-ip{font-size:0.72rem;font-weight:700;color:var(--cyan);font-family:monospace}
+.h-name{font-size:0.58rem;color:var(--text3);margin-top:1px}
+.h-empty{padding:16px;text-align:center;color:var(--text3);font-size:0.62rem}
+.hosts-foot{padding:8px 10px;border-top:1px solid var(--border);display:flex;gap:6px}
+.hosts-foot button{flex:1;font-size:0.62rem;padding:5px}
+
+/* Discovery Modal */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:1000;display:flex;align-items:center;justify-content:center;display:none}
+.modal-bg.on{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:10px;width:520px;max-width:95vw;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.5)}
+.modal-head{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+.modal-head h3{margin:0;font-size:0.8rem;font-weight:700;color:var(--text1)}
+.modal-close{margin-left:auto;background:none;border:none;color:var(--text3);cursor:pointer;font-size:1.1rem;padding:0;line-height:1}
+.modal-close:hover{color:var(--text1)}
+.modal-body{padding:16px;min-height:200px}
+.modal-foot{padding:10px 16px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.modal-foot button{font-size:0.65rem;padding:6px 14px}
+
+/* Scanning animation */
+.scan-anim{text-align:center;padding:20px 0}
+.radar{width:80px;height:80px;border-radius:50%;border:2px solid rgba(0,229,255,0.2);margin:0 auto 12px;position:relative;animation:radar-pulse 2s infinite}
+.radar::after{content:'';position:absolute;top:50%;left:50%;width:50%;height:2px;background:linear-gradient(90deg,transparent,var(--cyan));transform-origin:left center;animation:radar-spin 2s linear infinite}
+@keyframes radar-pulse{0%,100%{box-shadow:0 0 0 0 rgba(0,229,255,0.3)}50%{box-shadow:0 0 0 12px rgba(0,229,255,0)}}
+@keyframes radar-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+.scan-step{font-size:0.65rem;color:var(--cyan);margin-bottom:4px;font-family:monospace}
+.scan-sub{font-size:0.58rem;color:var(--text3)}
+
+/* Found hosts in modal */
+.modal-host{padding:8px 10px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;cursor:pointer;transition:all 0.12s;display:flex;align-items:center;gap:10px}
+.modal-host:hover{border-color:var(--cyan);background:rgba(0,229,255,0.05)}
+.modal-host.sel{border-color:var(--green);background:rgba(0,230,118,0.06)}
+.modal-host-dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;box-shadow:0 0 5px var(--green)}
+.modal-host-ip{font-size:0.72rem;font-weight:700;color:var(--cyan);font-family:monospace}
+.modal-host-name{font-size:0.58rem;color:var(--text3);margin-top:1px}
+.modal-host-sel{margin-left:auto;font-size:0.55rem;color:var(--green);display:none}
+.modal-host.sel .modal-host-sel{display:block}
+</style>
+
+<!-- Warning -->
+<div class="warn-bar">
+  <span>⚠</span>
+  <span><strong>Authorized Lab Scanning Only</strong> — Restricted to 10.10.10.0/24, 192.168.1.0/24, 172.16.0.0/16. Public IP scanning is blocked.</span>
+</div>
+
+<!-- Main Layout -->
+<div class="scan-wrap">
+  <!-- LEFT -->
+  <div class="scan-left">
+    <!-- Config -->
+    <div class="cfg-card">
+      <div class="cfg-title">Scan Configuration</div>
+
+      <div class="sel-badge on" id="sel-badge" style="display:none">
+        Selected: <span id="sel-badge-text">—</span>
+      </div>
+
+      <div class="form-row">
+        <div class="fg">
+          <label>Target IP / Network</label>
+          <input id="target" type="text" placeholder="10.10.10.5 or 10.10.10.0/24">
+        </div>
+        <div class="fg">
+          <label>Scan Type</label>
+          <select id="scan_type">
+            {% for st in scan_types %}<option value="{{ st.id }}">{{ st.name }}</option>{% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row three">
+        <div class="fg">
+          <label>Timing</label>
+          <select id="timing">
+            {% for k, v in timing_profiles.items() %}<option value="{{ k }}" {% if k=='normal' %}selected{% endif %}>{{ k|capitalize }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="fg">
+          <label>Interface</label>
+          <select id="iface">
+            {% for i in interfaces %}<option value="{{ i }}">{{ i }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="fg">
+          <label>Duration (s)</label>
+          <input id="cap_dur" type="number" value="30" min="5" max="120">
+        </div>
+      </div>
+
+      <button class="btn btn-p btn-launch" id="btn-scan" onclick="launchScan()">▶ Launch Scan</button>
+      <div id="scan-error-banner" style="display:none;margin-top:10px;padding:10px 14px;background:rgba(255,23,68,0.1);border:1px solid rgba(255,23,68,0.35);border-radius:6px;color:#ff1744;font-size:0.72rem;font-weight:600"></div>
+    </div>
+
+    <!-- hidden elements kept for JS compat -->
+    <div id="prog-card" style="display:none"><span id="prog-phase"></span><span id="prog-target"></span><span id="prog-pct"></span><div id="prog-fill"></div><div id="prog-msg"></div></div>
+    <!-- Discovered Hosts -->
+    <div class="hosts-card">
+      <div class="hosts-head">
+        <h4>🔍 Discovered Hosts</h4>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span class="res-badge" id="host-count-badge">0</span>
+          <button id="toggle-hosts-btn" onclick="toggleHostsList()" style="background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.25);border-radius:4px;color:var(--cyan);cursor:pointer;font-size:0.6rem;padding:2px 8px;" title="Hide/Show list">▲ Hide</button>
+        </div>
+      </div>
+      <div class="hosts-body" id="hosts-body">
+        <div class="h-empty">No hosts yet — click Discover</div>
+      </div>
+      <div class="hosts-foot" id="hosts-foot">
+        <button class="btn btn-p" onclick="openDiscovery()">🔍 Discover Network</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Active Scans -->
+  <div class="scan-right">
+    <div class="res-card">
+      <div class="res-head">
+        <h4>⚡ Active Scans</h4>
+        <span class="res-badge" id="active-count">0</span>
+      </div>
+      <div class="res-body" id="active-body">
+        <div class="res-empty">No active scans. Launch a scan to see progress here.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Discovery Modal -->
+<div class="modal-bg" id="disc-modal">
+  <div class="modal">
+    <div class="modal-head">
+      <span style="font-size:1.1rem">🌐</span>
+      <h3>Network Infrastructure Discovery</h3>
+      <button class="modal-close" onclick="closeDiscovery()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body">
+      <!-- filled by JS -->
+    </div>
+    <div class="modal-foot" id="modal-foot">
+      <button class="btn btn-d" onclick="closeDiscovery()">Close</button>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+var pollTimer=null;
+var discHosts=[];
+var selectedHost=null;
+
+document.addEventListener('DOMContentLoaded',function(){
+  loadSavedHosts();
+  loadScanResults();
+});
+
+/* ---- Discovery ---- */
+function openDiscovery(){
+  document.getElementById('disc-modal').classList.add('on');
+  startDiscovery();
+}
+
+function closeDiscovery(){
+  document.getElementById('disc-modal').classList.remove('on');
+}
+
+function startDiscovery(){
+  var steps=['Detecting network interfaces...','Reading ARP table...','Running ping sweep...','Resolving hostnames...'];
+  var si=0;
+  document.getElementById('modal-body').innerHTML=
+    '<div class="scan-anim">'+
+    '<div class="radar"></div>'+
+    '<div class="scan-step" id="scan-step">'+steps[0]+'</div>'+
+    '<div class="scan-sub">Scanning lab networks</div>'+
+    '</div>';
+  document.getElementById('modal-foot').innerHTML='<button class="btn btn-d" onclick="closeDiscovery()">Cancel</button>';
+
+  var iv=setInterval(function(){
+    si++;
+    if(si<steps.length){
+      var el=document.getElementById('scan-step');
+      if(el) el.textContent=steps[si];
+    }
+  },1800);
+
+  fetch('/api/discover/hosts',{method:'POST',headers:{'Content-Type':'application/json'}})
+    .then(r=>r.json())
+    .then(d=>{
+      clearInterval(iv);
+      discHosts=d.hosts||[];
+      showDiscoveryResults(discHosts);
+      loadSavedHosts();
+    })
+    .catch(e=>{
+      clearInterval(iv);
+      document.getElementById('modal-body').innerHTML='<div style="text-align:center;padding:20px;color:var(--red)">Discovery failed: '+e.message+'</div>';
+    });
+}
+
+function showDiscoveryResults(hosts){
+  if(hosts.length===0){
+    document.getElementById('modal-body').innerHTML=
+      '<div style="text-align:center;padding:24px;color:var(--text3)">'+
+      '<div style="font-size:2.5rem;margin-bottom:8px">🔍</div>'+
+      '<div style="font-size:0.7rem">No active hosts found</div>'+
+      '<div style="font-size:0.58rem;margin-top:6px">Make sure you are connected to the lab network</div>'+
+      '</div>';
+    document.getElementById('modal-foot').innerHTML='<button class="btn btn-s" onclick="startDiscovery()">⟳ Scan Again</button><button class="btn btn-d" onclick="closeDiscovery()">Close</button>';
+    return;
+  }
+
+  var html='<div style="font-size:0.6rem;color:var(--text3);margin-bottom:10px">Found '+hosts.length+' active host'+(hosts.length>1?'s':'')+'. Click to select for scanning.</div>';
+  for(var i=0;i<hosts.length;i++){
+    var h=hosts[i];
+    var ip=h.ip||h.ip_address||'';
+    var name=h.hostname||'';
+    html+='<div class="modal-host" onclick="selectModalHost(this,\''+ip+'\',\''+name+'\')" data-ip="'+ip+'">';
+    html+='<div class="modal-host-dot"></div>';
+    html+='<div><div class="modal-host-ip">'+ip+'</div><div class="modal-host-name">'+name+'</div></div>';
+    html+='<div class="modal-host-sel">✓ Selected</div>';
+    html+='</div>';
+  }
+  document.getElementById('modal-body').innerHTML=html;
+  document.getElementById('modal-foot').innerHTML=
+    '<button class="btn btn-s" onclick="startDiscovery()">⟳ Scan Again</button>'+
+    '<button class="btn btn-p" onclick="useSelectedHost()">Use Selected →</button>'+
+    '<button class="btn btn-d" onclick="closeDiscovery()">Close</button>';
+}
+
+function selectModalHost(el,ip,name){
+  document.querySelectorAll('.modal-host').forEach(h=>h.classList.remove('sel'));
+  el.classList.add('sel');
+  selectedHost={ip:ip,name:name};
+}
+
+function useSelectedHost(){
+  if(!selectedHost){alert('Click a host to select it first');return;}
+  document.getElementById('target').value=selectedHost.ip;
+  document.getElementById('sel-badge').style.display='block';
+  document.getElementById('sel-badge-text').textContent=selectedHost.name+' ('+selectedHost.ip+')';
+  document.querySelectorAll('.h-item').forEach(h=>h.classList.remove('sel'));
+  var card=document.getElementById('h-'+selectedHost.ip.replace(/\./g,'_'));
+  if(card) card.classList.add('sel');
+  closeDiscovery();
+}
+
+/* ---- Saved Hosts ---- */
+function loadSavedHosts(){
+  fetch('/api/discover/saved')
+    .then(r=>r.json())
+    .then(d=>{
+      var hosts=d.hosts||[];
+      document.getElementById('host-count-badge').textContent=hosts.length;
+      if(hosts.length===0){
+        document.getElementById('hosts-body').innerHTML='<div class="h-empty">No hosts yet — click Discover</div>';
+        return;
+      }
+      var html='';
+      for(var i=0;i<hosts.length;i++){
+        var h=hosts[i];
+        var safeIp=h.ip_address.replace(/\./g,'_');
+        html+='<div class="h-item" id="h-'+safeIp+'" style="justify-content:space-between">';
+        html+='<div style="display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;min-width:0" onclick="selectSavedHost(\''+h.ip_address+'\',\''+h.hostname+'\')">';
+        html+='<div class="h-dot"></div>';
+        html+='<div><div class="h-ip">'+h.ip_address+'</div><div class="h-name">'+h.hostname+'</div></div>';
+        html+='</div>';
+        html+='<button onclick="event.stopPropagation();hideHost(\''+h.ip_address+'\')" title="Hide this host permanently" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:0.75rem;padding:2px 7px;border-radius:3px;flex-shrink:0;line-height:1" onmouseover="this.style.color=\'#ff5555\'" onmouseout="this.style.color=\'var(--text3)\'">✕</button>';
+        html+='</div>';
+      }
+      document.getElementById('hosts-body').innerHTML=html;
+    });
+}
+
+function selectSavedHost(ip,name){
+  document.getElementById('target').value=ip;
+  document.getElementById('sel-badge').style.display='block';
+  document.getElementById('sel-badge-text').textContent=name+' ('+ip+')';
+  document.querySelectorAll('.h-item').forEach(h=>h.classList.remove('sel'));
+  var card=document.getElementById('h-'+ip.replace(/\./g,'_'));
+  if(card) card.classList.add('sel');
+}
+
+function clearHosts(){
+  if(!confirm('Clear all discovered hosts?')) return;
+  fetch('/api/discover/clear',{method:'POST'}).then(()=>loadSavedHosts());
+}
+function hideHost(ip){
+  fetch('/api/discover/hide',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ip:ip})
+  }).then(r=>r.json()).then(function(d){
+    if(d.success){
+      var el=document.getElementById('h-'+ip.replace(/\./g,'_'));
+      if(el){el.style.transition='opacity 0.3s';el.style.opacity='0';setTimeout(function(){loadSavedHosts();},320);}
+    }
+  });
+}
+// Restore show/hide state from localStorage
+var _hostsVisible=localStorage.getItem('ww_hosts_visible')!=='false';
+function toggleHostsList(){
+  var body=document.getElementById('hosts-body');
+  var foot=document.getElementById('hosts-foot');
+  var btn=document.getElementById('toggle-hosts-btn');
+  if(_hostsVisible){
+    localStorage.setItem('ww_hosts_visible','false');
+    body.style.display='none';
+    foot.style.display='none';
+    btn.innerHTML='▼ Show';
+    _hostsVisible=false;
+  } else {
+    body.style.display='';
+    foot.style.display='';
+    btn.innerHTML='▲ Hide';
+    localStorage.setItem('ww_hosts_visible','true');
+    _hostsVisible=true;
+  }
+}
+
+/* ---- Scan ---- */
+function launchScan(){
+  var t=document.getElementById('target').value.trim();
+  if(!t){alert('Enter a target IP or select a host from the list');return;}
+  if(!confirm('Scan: '+t+'\n\nConfirm this is an AUTHORIZED lab target.')){return;}
+  var btn=document.getElementById('btn-scan');
+  btn.disabled=true;
+  btn.innerHTML='⦿ Starting...';
+  fetch('/api/scan/start',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      target:t,
+      scan_type:document.getElementById('scan_type').value,
+      timing:document.getElementById('timing').value,
+      capture_iface:document.getElementById('iface').value,
+      capture_duration:parseInt(document.getElementById('cap_dur').value)
+    })
+  }).then(r=>r.json()).then(d=>{
+    // Reset button immediately so user can launch more scans
+    btn.disabled=false;
+    btn.innerHTML='▶ Launch Scan';
+    var errBanner=document.getElementById('scan-error-banner');
+    if(d.success){
+      errBanner.style.display='none';
+      var pc=document.getElementById('prog-card');
+      pc.classList.add('on');
+      document.getElementById('prog-target').textContent=t;
+      pollProgress(d.scan_uuid);
+      loadActiveScans();
+    }else{
+      errBanner.innerHTML='⚠️ '+(d.error||d.message||'Unknown error');
+      errBanner.style.display='block';
+    }
+  }).catch(e=>{
+    alert('Network error: '+e.message);
+    btn.disabled=false;
+    btn.innerHTML='▶ Launch Scan';
+  });
+}
+
+function pollProgress(uuid){
+  pollTimer=setInterval(function(){
+    fetch('/api/scan/progress/'+uuid)
+      .then(r=>r.json())
+      .then(d=>{
+        document.getElementById('prog-phase').textContent=d.phase.toUpperCase();
+        document.getElementById('prog-pct').textContent=d.percent+'%';
+        document.getElementById('prog-fill').style.width=d.percent+'%';
+        document.getElementById('prog-msg').textContent=d.message;
+        if(d.phase==='done'||d.phase==='error'||d.phase==='cancelled'){
+          clearInterval(pollTimer);
+          document.getElementById('prog-card').classList.remove('on');
+          loadActiveScans();
+        }
+      }).catch(()=>{});
+  },2000);
+}
+
+function cancelScan(){
+  clearInterval(pollTimer);
+  fetch('/api/scan/cancel',{method:'POST'}).then(r=>r.json()).then(function(){
+    document.getElementById('prog-card').classList.remove('on');
+    document.getElementById('btn-scan').disabled=false;
+    document.getElementById('btn-scan').innerHTML='▶ Launch Scan';
+    loadActiveScans();
+  }).catch(function(){
+    document.getElementById('prog-card').classList.remove('on');
+    document.getElementById('btn-scan').disabled=false;
+    document.getElementById('btn-scan').innerHTML='▶ Launch Scan';
+  });
+}
+
+
+/* ---- Active Scans Panel ---- */
+var activeScansTimer=null;
+function loadScanResults(){ loadActiveScans(); } // compat alias
+function loadActiveScans(){
+  fetch('/api/scan/active')
+    .then(r=>r.json())
+    .then(d=>{
+      var scans=d.scans||[];
+      document.getElementById('active-count').textContent=scans.length;
+      if(scans.length===0){
+        document.getElementById('active-body').innerHTML='<div class="res-empty">No active scans. Launch a scan to see progress here.</div>';
+        return;
+      }
+      var html='';
+      for(var i=0;i<scans.length;i++){
+        var s=scans[i];
+        var p=s.progress||{};
+        var pct=p.percent||0;
+        var phase=p.phase||'running';
+        var msg=p.message||'Running...';
+        var isDone=phase==='done';
+        var isErr=phase==='error'||phase==='cancelled';
+        var color=isDone?'var(--cyan)':isErr?'var(--red)':'var(--cyan)';
+        html+='<div class="res-item" style="cursor:default">';
+        html+='<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">';
+        html+='<div class="res-ip">'+s.target+'</div>';
+        html+='<span class="res-st '+(isDone?'done':isErr?'error':'running')+'">'+(isDone?'DONE':isErr?phase.toUpperCase():'RUNNING')+'</span>';
+        html+='</div>';
+        html+='<div style="font-size:0.7rem;color:var(--text2);margin-bottom:6px">'+msg+'</div>';
+        html+='<div style="background:rgba(255,255,255,0.05);border-radius:4px;height:6px;overflow:hidden">';
+        html+='<div style="height:100%;width:'+pct+'%;background:'+color+';transition:width 0.5s"></div>';
+        html+='</div>';
+        if(!isDone&&!isErr){
+          html+='<div style="display:flex;gap:6px;margin-top:8px">';
+          html+='<button class="btn btn-d" style="font-size:0.65rem;padding:3px 8px" onclick="cancelScanById(\''+s.scan_uuid+'\')">✕ Cancel</button>';
+          html+='</div>';
+        }
+        if(isDone){
+          html+='<div style="margin-top:8px"><a href="/results" class="btn btn-p" style="font-size:0.65rem;padding:3px 8px">View Results →</a></div>';
+        }
+        html+='</div>';
+      }
+      document.getElementById('active-body').innerHTML=html;
+    }).catch(()=>{});
+}
+function cancelScanById(uuid){
+  fetch('/api/scan/cancel',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scan_uuid:uuid})})
+    .then(()=>loadActiveScans());
+}
+// Poll active scans every 2 seconds
+setInterval(loadActiveScans,2000);
+
+// Restore show/hide state on page load
+(function(){
+  if(!_hostsVisible){
+    var body=document.getElementById('hosts-body');
+    var foot=document.getElementById('hosts-foot');
+    var btn=document.getElementById('toggle-hosts-btn');
+    if(body) body.style.display='none';
+    if(foot) foot.style.display='none';
+    if(btn) btn.innerHTML='▼ Show';
+  }
+})();
+</script>
+{% endblock %}

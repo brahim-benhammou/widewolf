@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% block title %}Scan Details — {{ scan.uuid }}{% endblock %}
+{% block page_title %}Scan Details{% endblock %}
+{% block content %}
+<!-- Summary -->
+<div class="card" style="margin-bottom:12px">
+  <div class="card-b" style="padding:10px 14px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span class="badge b-{{ scan.status }}">{{ scan.status }}</span>
+      <span style="font-size:0.7rem;color:var(--text2)">Target: <strong style="color:var(--cyan)">{{ scan.target }}</strong></span>
+      <span style="font-size:0.65rem;color:var(--text3)">Type: {{ scan.scan_type }}</span>
+      <span style="font-size:0.65rem;color:var(--text3)">Timing: {{ scan.timing }}</span>
+      <span style="font-size:0.65rem;color:var(--text3)">Duration: {{ scan.duration_seconds or '—' }}s</span>
+      <span style="font-size:0.65rem;color:var(--text3)">{{ scan.started_at[:16] if scan.started_at else '' }}</span>
+      <a href="/api/report/{{ scan.id }}" class="btn btn-p btn-sm" style="margin-left:auto">Download Report</a>
+    </div>
+    {% if scan.nmap_command %}
+    <div style="margin-top:8px;padding:6px 10px;background:var(--bg3);border-radius:4px;font-family:monospace;font-size:0.6rem;color:var(--text3);overflow-x:auto;white-space:nowrap">{{ scan.nmap_command }}</div>
+    {% endif %}
+    {% if scan.error_message %}
+    <div style="margin-top:6px;padding:8px 10px;background:rgba(255,82,82,0.1);border:1px solid rgba(255,82,82,0.3);border-radius:4px;font-size:0.65rem;color:#ff5252">
+      <strong>Error:</strong> {{ scan.error_message }}
+    </div>
+    {% endif %}
+    {% if scan.status == 'completed' and not hosts %}
+    <div style="margin-top:6px;padding:8px 10px;background:rgba(255,215,64,0.1);border:1px solid rgba(255,215,64,0.3);border-radius:4px;font-size:0.65rem;color:#ffd740">
+      <strong>Note:</strong> Scan completed but no hosts were discovered. Possible causes:<br>
+      &bull; Target firewall is blocking all scanned ports (try Full Port Scan)<br>
+      &bull; Target is not reachable from this appliance (check with: ping {{ scan.target }})<br>
+      &bull; Try SYN Stealth scan which may bypass some firewalls
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Two columns: Hosts + Findings -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+  <!-- Hosts & Ports -->
+  <div class="card">
+    <div class="card-h"><h3>Discovered Hosts ({{ hosts|length }})</h3></div>
+    <div class="card-b" style="max-height:calc(100vh - 260px);overflow-y:auto;padding:8px">
+      {% for h in hosts %}
+      <div style="margin-bottom:10px;padding:8px;background:var(--bg3);border-radius:5px;border-left:3px solid var(--cyan)">
+        <div style="font-size:0.75rem;font-weight:700;color:var(--cyan);font-family:monospace;margin-bottom:4px">{{ h.ip_address }}{% if h.hostname %} ({{ h.hostname }}){% endif %}</div>
+        {% set host_services = services|selectattr('host_id','equalto',h.id)|list %}
+        {% if host_services %}
+        <table style="width:100%;font-size:0.6rem;border-collapse:collapse">
+          <tr style="color:var(--text3)"><th style="text-align:left;padding:2px 4px">Port</th><th style="text-align:left;padding:2px 4px">State</th><th style="text-align:left;padding:2px 4px">Service</th><th style="text-align:left;padding:2px 4px">Version</th></tr>
+          {% for svc in host_services %}
+          <tr style="color:var(--text2)">
+            <td style="padding:2px 4px;font-family:monospace;color:var(--green)">{{ svc.port }}/{{ svc.protocol }}</td>
+            <td style="padding:2px 4px">{{ svc.state }}</td>
+            <td style="padding:2px 4px">{{ svc.service_name or '—' }}</td>
+            <td style="padding:2px 4px;font-size:0.55rem">{{ svc.product or '' }} {{ svc.version or '' }}</td>
+          </tr>
+          {% endfor %}
+        </table>
+        {% else %}
+        <div style="font-size:0.6rem;color:var(--text3)">No open ports detected</div>
+        {% endif %}
+      </div>
+      {% else %}
+      <div style="text-align:center;color:var(--text3);padding:20px;font-size:0.7rem">No hosts discovered</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Findings -->
+  <div class="card">
+    <div class="card-h"><h3>Security Findings ({{ findings|length }})</h3></div>
+    <div class="card-b" style="max-height:calc(100vh - 260px);overflow-y:auto;padding:8px">
+      {% for f in findings %}
+      <div style="margin-bottom:8px;padding:8px;background:var(--bg3);border-radius:5px;border-left:3px solid {% if f.severity=='critical' %}var(--red){% elif f.severity=='high' %}var(--orange){% elif f.severity=='medium' %}var(--yellow){% else %}var(--cyan){% endif %}">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+          <span class="badge b-{{ f.severity }}">{{ f.severity }}</span>
+          <span style="font-size:0.65rem;font-weight:600;color:var(--text1)">{{ f.title }}</span>
+        </div>
+        <div style="font-size:0.6rem;color:var(--text2);line-height:1.4">{{ f.description }}</div>
+        {% if f.recommendation %}
+        <div style="font-size:0.55rem;color:var(--green);margin-top:3px">&#10003; {{ f.recommendation }}</div>
+        {% endif %}
+      </div>
+      {% else %}
+      <div style="text-align:center;color:var(--text3);padding:20px;font-size:0.7rem">No findings generated</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Traffic -->
+{% if traffic %}
+<div class="card" style="margin-top:12px">
+  <div class="card-h"><h3>Traffic Analysis</h3></div>
+  <div class="card-b">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;font-size:0.65rem">
+      <div><span class="fl">Packets</span><div style="color:var(--text1)">{{ traffic.total_packets }}</div></div>
+      <div><span class="fl">Protocols</span><div style="color:var(--text1)">{{ traffic.protocols }}</div></div>
+      <div><span class="fl">Cleartext</span><div style="color:{% if traffic.cleartext_detected %}var(--red){% else %}var(--green){% endif %}">{% if traffic.cleartext_detected %}DETECTED{% else %}None{% endif %}</div></div>
+      <div><span class="fl">Duration</span><div style="color:var(--text1)">{{ traffic.duration_seconds }}s</div></div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div style="margin-top:12px"><a href="/results" class="btn btn-s">&larr; Back to Results</a></div>
+{% endblock %}

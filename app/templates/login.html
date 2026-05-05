@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WideWolf — Login</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{height:100vh;display:flex;align-items:center;justify-content:center;background:#0a0e14;font-family:'Segoe UI',system-ui,sans-serif}
+.box{width:320px;background:#111820;border:1px solid #2a3a4e;border-radius:10px;padding:30px}
+.logo{text-align:center;margin-bottom:20px}
+.logo h1{font-size:1.3rem;color:#00e5ff;letter-spacing:2px}
+.logo .sub{font-size:0.55rem;color:#5a6a80;text-transform:uppercase;letter-spacing:2px;margin-top:3px}
+.fg{margin-bottom:14px}
+.fl{display:block;font-size:0.6rem;color:#5a6a80;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.fi{width:100%;padding:9px 11px;background:#1a2332;border:1px solid #2a3a4e;border-radius:4px;color:#e4e8ef;font-size:0.8rem;font-family:inherit}
+.fi:focus{outline:none;border-color:#00e5ff}
+.btn{width:100%;padding:10px;background:rgba(0,229,255,0.08);border:1px solid rgba(0,229,255,0.3);border-radius:5px;color:#00e5ff;font-size:0.8rem;font-weight:700;cursor:pointer;transition:all 0.2s;margin-top:6px;font-family:inherit}
+.btn:hover{background:#00e5ff;color:#000}
+.err{background:rgba(255,82,82,0.1);border:1px solid rgba(255,82,82,0.3);border-radius:4px;padding:7px 10px;font-size:0.65rem;color:#ff5252;margin-bottom:12px}
+.warn{margin-top:16px;padding:8px;border:1px solid rgba(255,152,0,0.3);border-radius:4px;background:rgba(255,152,0,0.05);text-align:center;font-size:0.55rem;color:#ff9800}
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="logo"><h1>WideWolf</h1><div class="sub">Authenticate to Continue</div></div>
+  {% if error %}<div class="err">{{ error }}</div>{% endif %}
+  <form method="POST" action="/login">
+    <div class="fg"><label class="fl">Username</label><input class="fi" type="text" name="username" value="admin" autocomplete="username"></div>
+    <div class="fg"><label class="fl">Password</label><input class="fi" type="password" name="password" autocomplete="current-password" autofocus></div>
+    <button type="submit" class="btn">&#9654; AUTHENTICATE</button>
+  </form>
+  <div class="warn">FOR EDUCATIONAL USE ONLY — ITP 258 College Project<br>Authorized lab environment only.</div>
+</div>
+</body>
+</html>
